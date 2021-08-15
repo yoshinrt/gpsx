@@ -6,6 +6,7 @@ import sys
 import contextlib
 import os
 import gzip
+import re
 from math import sin, cos, sqrt, atan2
 
 ##############################################################################
@@ -44,14 +45,14 @@ class PointClass:
 	y			= None
 	
 	def __repr__(self):
-		return '%s [%f:%f] (%f:%f) spd:%f alt:%f dir:%f' % (
+		return '%s [%10.6f %10.6f] (%.1f %.1f) %5.1fkm/h %5.1fdeg %.1fm' % (
 			self.DateTime.isoformat(),
 			self.Longitude, self.Latitude,
 			self.x if self.x else -1,
 			self.y if self.y else -1,
-			self.Altitude if self.Altitude else -1,
 			self.Speed	if self.Speed	else -1,
-			self.Bearing  if self.Bearing  else -1
+			self.Bearing  if self.Bearing  else -1,
+			self.Altitude if self.Altitude else -1,
 		)
 
 ##############################################################################
@@ -64,8 +65,8 @@ class GpsLogClass:
 	# ヒュベニの公式
 	_a = 6378137.0
 	_b = 6356752.314140
-	_e2 = ( _a ** 2 - _b ** 2 ) / _a ** 2
-	_Mnum = _a * ( 1 - _e2 )
+	_e2 = (_a ** 2 - _b ** 2) / _a ** 2
+	_Mnum = _a * (1 - _e2)
 	
 	def deg2rad(self, deg):
 		return deg * self._ToRad
@@ -78,14 +79,14 @@ class GpsLogClass:
 		self.Points[0].y = 0
 		
 		for i in range(1, len(self.Points)):
-			_dy = self.deg2rad( self.Points[i].Latitude - self.Points[i - 1].Latitude )
-			_dx = self.deg2rad( self.Points[i].Longitude - self.Points[i - 1].Longitude )
-			_My = self.deg2rad(( self.Points[i].Latitude + self.Points[i - 1].Latitude ) / 2 )
-			_W = sqrt( 1 - self._e2 * sin( _My ) ** 2 )
+			_dy = self.deg2rad(self.Points[i].Latitude - self.Points[i - 1].Latitude)
+			_dx = self.deg2rad(self.Points[i].Longitude - self.Points[i - 1].Longitude)
+			_My = self.deg2rad((self.Points[i].Latitude + self.Points[i - 1].Latitude) / 2)
+			_W = sqrt(1 - self._e2 * sin(_My) ** 2)
 			_M = self._Mnum / _W ** 3
 			_N = self._a / _W
 			
-			self.Points[i].x = self.Points[i - 1].x + _dx * _N * cos( _My )
+			self.Points[i].x = self.Points[i - 1].x + _dx * _N * cos(_My)
 			self.Points[i].y = self.Points[i - 1].y + _dy * _M
 	
 	def Distance(self, p1, p2):
@@ -164,9 +165,11 @@ class GpsLogClass:
 	
 	def Read(self, file, format):
 		Func = {
-			'nmea':	self.Read_nmea,
-			'log':	self.Read_vsd,
-			'vsd':	self.Read_vsd,
+			'nmea':			self.Read_nmea,
+			'gpx':			self.Read_gpx,
+			'log':			self.Read_vsd,
+			'vsd':			self.Read_vsd,
+			'RaceChrono':	self.Read_RaceChrono,
 		}
 		
 		format = self.GetFormat(file, format)
@@ -178,8 +181,10 @@ class GpsLogClass:
 	
 	def Write(self, file, format):
 		Func = {
-			'nmea':	self.Write_nmea,
+			'nmea':			self.Write_nmea,
+			'gpx':			self.Write_gpx,
 			'RaceChrono':	self.Write_RaceChrono,
+			'dbg':			self.Write_debug,
 		}
 		
 		format = self.GetFormat(file, format)
@@ -241,7 +246,8 @@ class GpsLogClass:
 						Date	= int(Param[9])
 						Point.DateTime	= datetime.datetime(
 							Date % 100 + 2000, Date // 100 % 100, Date // 10000,
-							Time // 10000, Time // 100 % 100, Time % 100, TimeUs
+							Time // 10000, Time // 100 % 100, Time % 100, TimeUs,
+							tzinfo = datetime.timezone.utc
 						)
 						
 						Point.Longitude	= self.NmeaStr2LatLng(Param[5], Param[6])
@@ -277,8 +283,70 @@ class GpsLogClass:
 				FileOut.write(s + self.NmeaGenChksum(s) + '\n')
 	
 	##########################################################################
+	# GPX reader/writer
+	
+	def Read_gpx(self, FileName):
+		with smart_open(FileName, 'rt') as FileIn:
+			for match in re.finditer('<trkpt.*?</trkpt>', FileIn.read(), flags = re.DOTALL):
+				Point = PointClass()
+				
+				str = match.group(0)
+				
+				m = re.search(r'<time>\s*(\S+?)\s*</', str)
+				if not m:
+					continue
+				Point.DateTime = datetime.datetime.fromisoformat(m.group(1).replace('Z', '+00:00'))
+				
+				m = re.search(r'lat="(.*?)"', str)
+				if not m:
+					continue
+				Point.Latitude = float(m.group(1))
+				
+				m = re.search(r'lon="(.*?)"', str)
+				if not m:
+					continue
+				Point.Longitude = float(m.group(1))
+				
+				m = re.search(r'<ele>\s*(\S+?)\s*</', str)
+				if m:
+					Point.Altitude = float(m.group(1))
+				
+				m = re.search(r'<speed>\s*(\S+?)\s*</', str)
+				if m:
+					Point.Speed = float(m.group(1)) * 3.6
+				
+				m = re.search(r'<course>\s*(\S+?)\s*</', str)
+				if m:
+					Point.Bearing = float(m.group(1))
+				
+				self.Points.append(Point)
+	
+	def Write_gpx(self, FileName):
+		with smart_open(FileName, 'wt') as FileOut:
+			
+			FileOut.write(
+				'<?xml version="1.0"?><gpx version="1.0" creator="GPSLogger - http://gpslogger.mendhak.com/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.topografix.com/GPX/1/0" xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd"><time>%s</time><bounds /><trk><trkseg>\n' % (
+					self.Points[0].DateTime.isoformat()
+				)
+			)
+			
+			self.GenSpeed()
+			self.GenAltitude()
+			self.GenBearing()
+			
+			for Point in self.Points:
+				FileOut.write(
+					'<trkpt lat="%s" lon="%s"><ele>%s</ele><course>%s</course><speed>%s</speed><time>%s</time></trkpt>\n' % (
+						str(Point.Latitude), str(Point.Longitude), str(Point.Altitude),
+						str(Point.Bearing), str(Point.Speed / 3.6), Point.DateTime.isoformat()
+					)
+				)
+			
+			FileOut.write('</trkseg></trk></gpx>\n')
+	
+	##########################################################################
 	# RaceChrono reader/writer
-	# 1: ULONG ローカル時刻 [ms]
+	# 1: ULONG epoch 時刻 [ms]
 	# 2: ULONG 走行距離 [1/1000m]
 	# 3: int latitude, int longitude [1/6000000度]
 	# 4: UINT 速度 [1/277.7792km/h, キリがいいのに近いのは 1/512knot?]
@@ -290,39 +358,85 @@ class GpsLogClass:
 	# 30005: DOP 座標精度 [*1/1000], -128:データなし
 	# すべてリトルエンディアン
 	
+	def Read_RaceChrono(self, DirName):
+		if DirName == '-':
+			raise Exception("RaceChrono reader can't input from stdin")
+		
+		with open(DirName + '/channel_1_100_0_1_1', 'rb') as fhTime:
+			with open(DirName + '/channel_1_100_0_2_1', 'rb') as fhDistance:
+				with open(DirName + '/channel_1_100_0_3_1', 'rb') as fhLatLng:
+					with open(DirName + '/channel_1_100_0_4_0', 'rb') as fhSpeed:
+						with open(DirName + '/channel_1_100_0_5_0', 'rb') as fhAlt:
+							with open(DirName + '/channel_1_100_0_6_0', 'rb') as fhDir:
+								while True:
+									Point = PointClass()
+									
+									data = fhTime.read(8)
+									if len(data) < 8:
+										break
+									Point.DateTime = datetime.datetime.utcfromtimestamp(int.from_bytes(data, 'little') / 1000)
+									
+									data = fhDistance.read(8)
+									if len(data) < 8:
+										break
+									Point.Distance = int.from_bytes(data, 'little') / 1000
+									
+									data = fhLatLng.read(8)
+									if len(data) < 8:
+										break
+									Point.Longitude = int.from_bytes(data[4:8], 'little', signed = True) / 6000000
+									Point.Latitude  = int.from_bytes(data[0:4], 'little', signed = True) / 6000000
+									
+									data = fhSpeed.read(4)
+									if len(data) < 4:
+										break
+									Point.Speed = int.from_bytes(data, 'little') / 277.7792
+									
+									data = fhAlt.read(4)
+									if len(data) < 4:
+										break
+									Point.Altitude = int.from_bytes(data, 'little', signed = True) / 1000
+									
+									data = fhDir.read(4)
+									if len(data) < 4:
+										break
+									Point.Bearing = int.from_bytes(data, 'little') / 1000
+									
+									self.Points.append(Point)
+	
 	def Write_RaceChrono(self, DirName):
 		if DirName == '-':
-			raise Exception( "RaceChrono writer can't output to stdout" )
+			raise Exception("RaceChrono writer can't output to stdout")
 		
 		# dir 作成
 		os.makedirs(DirName, exist_ok=True)
 		
-		with smart_open(DirName + '/channel_1_100_0_1_1', 'wb') as FileOut:
+		with open(DirName + '/channel_1_100_0_1_1', 'wb') as FileOut:
 			for Point in self.Points:
-				FileOut.write(int((Point.DateTime.timestamp() + 9 * 3600) * 1000).to_bytes(8, 'little'))
+				FileOut.write(int(Point.DateTime.timestamp() * 1000).to_bytes(8, 'little'))
 		
 		self.GenDistance()
-		with smart_open(DirName + '/channel_1_100_0_2_1', 'wb') as FileOut:
+		with open(DirName + '/channel_1_100_0_2_1', 'wb') as FileOut:
 			for Point in self.Points:
 				FileOut.write(int(Point.Distance * 1000).to_bytes(8, 'little'))
 		
-		with smart_open(DirName + '/channel_1_100_0_3_1', 'wb') as FileOut:
+		with open(DirName + '/channel_1_100_0_3_1', 'wb') as FileOut:
 			for Point in self.Points:
 				FileOut.write(int(Point.Latitude  * 6000000).to_bytes(4, 'little', signed = True))
 				FileOut.write(int(Point.Longitude * 6000000).to_bytes(4, 'little', signed = True))
 		
 		self.GenSpeed()
-		with smart_open(DirName + '/channel_1_100_0_4_0', 'wb') as FileOut:
+		with open(DirName + '/channel_1_100_0_4_0', 'wb') as FileOut:
 			for Point in self.Points:
 				FileOut.write(int(Point.Speed * 277.7792).to_bytes(4, 'little'))
 		
 		self.GenAltitude()
-		with smart_open(DirName + '/channel_1_100_0_5_0', 'wb') as FileOut:
+		with open(DirName + '/channel_1_100_0_5_0', 'wb') as FileOut:
 			for Point in self.Points:
 				FileOut.write(int(Point.Altitude * 1000).to_bytes(4, 'little', signed = True))
 		
 		self.GenBearing()
-		with smart_open(DirName + '/channel_1_100_0_6_0', 'wb') as FileOut:
+		with open(DirName + '/channel_1_100_0_6_0', 'wb') as FileOut:
 			for Point in self.Points:
 				FileOut.write(int(Point.Bearing * 1000).to_bytes(4, 'little', signed = True))
 	
@@ -345,15 +459,18 @@ class GpsLogClass:
 					Point = PointClass()
 					self.Points.append(Point)
 					
-					if Param[1].endswith('Z'):
-						Param[1] = Param[1][:-1]
-					
-					Point.DateTime	= datetime.datetime.fromisoformat(Param[1])
+					Point.DateTime	= datetime.datetime.fromisoformat(Param[1].replace('Z', '+00:00'))
 					Point.Longitude	= float(Param[2])
 					Point.Latitude	= float(Param[3])
 					Point.Altitude	= float(Param[4])
 					Point.Speed		= float(Param[5])
 
+	##########################################################################
+	# Points dumper
+	def Write_debug(self, FileName):
+		with smart_open(FileName, 'wt') as FileOut:
+			FileOut.write(str(self.Points).replace(',', '\n'))
+	
 ##############################################################################
 # process all file
 
@@ -383,8 +500,6 @@ def Convert(Arg):
 			output_file = os.path.splitext(output_file)[0]
 			if Arg.output_format != 'RaceChrono':
 				output_file += '.' + Arg.output_format
-			
-			print(output_file)
 		
 		GpsLog.Read(input_file, Arg.input_format)
 		
