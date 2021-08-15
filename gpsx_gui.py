@@ -1,0 +1,229 @@
+''' kv sample3 '''
+from kivy.app import App
+from kivy.lang import Builder
+from kivy.uix.widget import Widget
+from kivy.uix.popup import Popup
+from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
+from kivy.uix.popup import Popup
+import datetime
+from os import path
+import gpsx
+
+Builder.load_string('''
+<MainWidget>:
+	BoxLayout:
+		orientation: 'vertical'
+		size: root.size
+		
+		BoxLayout:
+			orientation: 'horizontal'
+			height: '50sp'
+			size_hint: 1.0, None
+			
+			Label:
+				text: 'Input file'
+				size_hint: 1.0, 1.0
+				
+			Spinner:
+				id: input_format
+				text: 'auto'
+				values: 'auto', 'nmea', 'gpx', 'kml', 'vsd'
+				width: '100sp'
+				size_hint: None, 1.0
+				
+			Button:
+				text: '...'
+				width: '50sp'
+				size_hint: None, 1.0
+				on_press: root.InputButtonPressed()
+			
+		TextInput:
+			id: InputFile
+			text: root.InputFile
+			height: '100sp'
+			size_hint: 1.0, None
+		
+		BoxLayout:
+			orientation: 'horizontal'
+			height: '50sp'
+			size_hint: 1.0, None
+			
+			Label:
+				text: 'Output file'
+				size_hint: 1.0, 1.0
+			
+			Spinner:
+				id: output_format
+				text: 'RaceChrono'
+				values: 'RaceChrono', 'nmea', 'gpx', 'kml', 'vsd'
+				width: '100sp'
+				size_hint: None, 1.0
+				
+			Button:
+				text: '...'
+				width: '50sp'
+				size_hint: None, 1.0
+				on_press: root.OutputButtonPressed()
+			
+		TextInput:
+			text: root.OutputFile
+			height: '100sp'
+			size_hint: 1.0, None
+		
+		Button:
+			hight: '50sp'
+			size_hint: 1, None
+			text: 'Convert'
+			on_press: root.ConvertButtonPressed()
+		
+		Label:
+			text: 'Log'
+			height: '30sp'
+			size_hint: 1.0, None
+			halign: 'left'
+			text_size: self.size
+		
+		TextInput:
+			text: root.Log
+			readonly: True
+			size_hint: 1.0, 1.0
+			foreground_color: 1, 1, 1, 1
+			background_color: 0, 0, 0, 1
+
+<FileSelectPopup>:
+	title: root.Path
+	
+	BoxLayout:
+		orientation: 'vertical'
+		size: root.size
+		
+		FileChooserIconView:
+			id: FileChooser
+			path: root.Path
+			multiselect: root.Multi
+			on_touch_down: root.title = self.path
+		
+		BoxLayout:
+			orientation: 'horizontal'
+			height: '50sp'
+			size_hint: 1, None
+			
+			Button:
+				text: 'OK'
+				on_press: root.OkButtonPressed(FileChooser.path, FileChooser.selection)
+			
+			Button:
+				text: 'Select dir'
+				on_press: root.OkButtonPressed(FileChooser.path, None)
+			
+			Button:
+				text: 'Cancel'
+				on_press: root.CancelButtonPressed()
+''')
+
+
+class FileSelectPopup(Popup):
+	OnOk		= ObjectProperty(None)
+	OnCancel	= ObjectProperty(None)
+	Path		= StringProperty(None)
+	Multi		= BooleanProperty(False)
+	
+	def __init__(self, **kwargs) -> None:
+		super(FileSelectPopup, self).__init__(**kwargs)
+		self.auto_dismiss = False
+		
+	
+	def OkButtonPressed(self, path, selection):
+		# ファイルが何も選択されていない
+		if selection is not None and len(selection) == 0:
+			return
+		
+		self.dismiss()
+		if self.OnOk:
+			self.OnOk(path, selection)
+	
+	def CancelButtonPressed(self):
+		self.dismiss()
+		if self.OnCancel:
+			self.OnCancel(path, selection)
+
+class SimpleArg():
+	input_file		= []
+	input_format	= None
+	output_file		= None
+	output_format	= None
+
+class MainWidget(Widget):
+	InputFile	= StringProperty('/sdcard/OneDrive/vsd/log/vsd.log')
+	OutputFile	= StringProperty(
+		'/sdcard/Android/data/com.racechrono.app/files/sessions/session_' +
+		datetime.datetime.now().strftime("%Y%m%d_%H%M")
+	)
+	Log			= StringProperty('* GPS log converter\n')
+	
+	def InputButtonPressed(self):
+		self.popup = FileSelectPopup(
+			Path		= os.path.dirname(self.InputFile),
+			size_hint	= (0.9, 0.9),
+			Multi		= True,
+			OnOk		= self.OnInputOk
+		)
+		self.popup.open()
+	
+	def OnInputOk(self, path, selection):
+		if selection is None:
+			self.InputFile = path + '/'
+		else:
+			self.InputFile = '\n'.join(selection)
+		
+		self.Log += '* Input file selected: ' + self.InputFile + '\n'
+	
+	def OutputButtonPressed(self):
+		self.popup = FileSelectPopup(
+			Path		= os.path.dirname(self.OutputFile),
+			size_hint	= (0.9, 0.9),
+			OnOk		= self.OnOutputOk
+		)
+		self.popup.open()
+	
+	def OnOutputOk(self, path, selection):
+		if selection is None:
+			self.OutputFile = path + '/'
+		else:
+			self.OutputFile = selection[0]
+		
+		self.Log += '* Output file selected: ' + self.OutputFile + '\n'
+	
+	def ConvertButtonPressed(self):
+		Arg = SimpleArg()
+		
+		for file in self.InputFile.split('\n'):
+			if len(file) > 0:
+				Arg.input_file.append(file)
+		Arg.input_format = self.ids['input_format'].text
+		
+		if Arg.input_format == 'auto':
+			Arg.input_format = None
+		
+		Arg.output_file = self.OutputFile
+		Arg.output_format = self.ids['output_format'].text
+		if Arg.output_format == 'auto':
+			Arg.output_format = None
+		
+		self.Log += ('* Start log converting...\n' +
+			'  in: %s format=%s\n' +
+			'  out: %s format=%s\n') % (
+				Arg.input_file, Arg.input_format,
+				Arg.output_file, Arg.output_format
+			)
+		
+		gpsx.Convert(Arg)
+		
+		self.Log += '* done.\n'
+	
+class MyApp(App):
+	def build(self):
+		return MainWidget()
+
+if __name__ == '__main__':
+	MyApp().run()
