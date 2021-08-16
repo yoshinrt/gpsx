@@ -46,19 +46,32 @@ class PointClass:
 	
 	def __repr__(self):
 		return '%s [%10.6f %10.6f] (%.1f %.1f) %5.1fkm/h %5.1fdeg %.1fm' % (
-			self.DateTime.isoformat(),
+			self.DateTime.isoformat() if self.DateTime is not None else 'None',
 			self.Longitude, self.Latitude,
-			self.x if self.x else -1,
-			self.y if self.y else -1,
-			self.Speed	if self.Speed	else -1,
-			self.Bearing  if self.Bearing  else -1,
-			self.Altitude if self.Altitude else -1,
+			self.x if self.x is not None else -1,
+			self.y if self.y is not None else -1,
+			self.Speed	if self.Speed	is not None else -1,
+			self.Bearing  if self.Bearing  is not None else -1,
+			self.Altitude if self.Altitude is not None else -1,
 		)
 
 ##############################################################################
 
 class GpsLogClass:
 	Points = []
+	
+	def __init__(self):
+		GpsLogClass.FuncTbl = {
+			'nmea':			(self.Read_nmea,		self.Write_nmea),
+			'gpx':			(self.Read_gpx,			self.Write_gpx),
+			'kml':			(self.Read_kml,			self.Write_kml),
+			'log':			(self.Read_vsd,			None),
+			'vsd':			(self.Read_vsd,			None),
+			'RaceChrono':	(self.Read_RaceChrono,	self.Write_RaceChrono),
+			'dbg':			(None,					self.Write_debug),
+		}
+	
+	##########################################################################
 	
 	_ToRad = 3.14159265358979 / 180
 	
@@ -145,54 +158,35 @@ class GpsLogClass:
 	##########################################################################
 	# reader / writer auto detect
 	
-	def ErrorUnknownFormat(self, file, format):
-		raise Exception( 'Unknown format: %s format=%s' % (str(file), str(format)))
-	
 	def GetFormat(self, file, format):
-		if format:
-			return format
-		
-		if file is not None and file != '-':
+		if not format and file is not None and file != '-':
 			(file2, ext) = os.path.splitext(file)
 			if ext == '.gz':
 				(file2, ext) = os.path.splitext(file2)
 			
 			if len(ext) >= 2:
-				ext = ext[1:]
-				return ext.lower()
+				format = ext[1:].lower()
+				
+		if format in self.FuncTbl:
+			return format
 		
-		self.ErrorUnknownFormat(file, format)
+		raise Exception('Unknown format: %s format=%s' % (str(file), str(format)))
 	
 	def Read(self, file, format):
-		Func = {
-			'nmea':			self.Read_nmea,
-			'gpx':			self.Read_gpx,
-			'log':			self.Read_vsd,
-			'vsd':			self.Read_vsd,
-			'RaceChrono':	self.Read_RaceChrono,
-		}
-		
 		format = self.GetFormat(file, format)
 		
-		if format not in Func:
-			self.ErrorUnknownFormat(file, format)
+		if format not in self.FuncTbl or self.FuncTbl[format][0] is None:
+			raise Exception('Format %s input not available: %s ' % (str(format), str(file)))
 		
-		Func[format](file)
+		self.FuncTbl[format][0](file)
 	
 	def Write(self, file, format):
-		Func = {
-			'nmea':			self.Write_nmea,
-			'gpx':			self.Write_gpx,
-			'RaceChrono':	self.Write_RaceChrono,
-			'dbg':			self.Write_debug,
-		}
-		
 		format = self.GetFormat(file, format)
 		
-		if format not in Func:
-			self.ErrorUnknownFormat(file, format)
+		if self.FuncTbl[format][1] is None:
+			raise Exception('Format %s output not available: %s ' % (str(format), str(file)))
 		
-		Func[format](file)
+		self.FuncTbl[format][1](file)
 	
 	##########################################################################
 	# NMEA reader/writer
@@ -345,6 +339,202 @@ class GpsLogClass:
 			FileOut.write('</trkseg></trk></gpx>\n')
 	
 	##########################################################################
+	# KML reader/writer
+	
+	def Read_kml(self, FileName):
+		with smart_open(FileName, 'rt') as FileIn:
+			for match in re.finditer('<Placemark.*?</Placemark>', FileIn.read(), flags = re.DOTALL):
+				Point = PointClass()
+				
+				str = match.group(0)
+				
+				m = re.search(r'<when>\s*(\S+?)\s*</', str)
+				if not m:
+					continue
+				Point.DateTime = datetime.datetime.fromisoformat(m.group(1).replace('Z', '+00:00'))
+				
+				m = re.search(r'<coordinates>\s*([\d\.\-]+),([\d\.\-]+)\s*</', str)
+				if not m:
+					continue
+				Point.Longitude = float(m.group(1))
+				Point.Latitude  = float(m.group(2))
+				
+				self.Points.append(Point)
+	
+	def Write_kml(self, FileName):
+		with smart_open(FileName, 'wt') as FileOut:
+			
+			self.GenSpeed()
+			self.GenAltitude()
+			self.GenBearing()
+			self.GenDistance()
+			
+			FileOut.write('''\
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"
+    xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>GPS device</name>
+    <snippet>Created {now}</snippet>
+    <LookAt>
+      <gx:TimeSpan>
+        <begin>{start}</begin>
+        <end>{end}</end>
+      </gx:TimeSpan>
+      <longitude>kml</longitude>
+      <latitude>{lat}</latitude>
+      <range>1300.000000</range>
+    </LookAt>
+<!-- Normal track style -->
+    <Style id="track_n">
+      <IconStyle>
+        <scale>.5</scale>
+        <Icon>
+          <href>http://earth.google.com/images/kml-icons/track-directional/track-none.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+<!-- Highlighted track style -->
+    <Style id="track_h">
+      <IconStyle>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://earth.google.com/images/kml-icons/track-directional/track-none.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <StyleMap id="track">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#track_n</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#track_h</styleUrl>
+      </Pair>
+    </StyleMap>
+<!-- Normal waypoint style -->
+    <Style id="waypoint_n">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/pal4/icon61.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+<!-- Highlighted waypoint style -->
+    <Style id="waypoint_h">
+      <IconStyle>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/pal4/icon61.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <StyleMap id="waypoint">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#waypoint_n</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#waypoint_h</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="lineStyle">
+      <LineStyle>
+        <color>FFFFFF00</color>
+        <width>1</width>
+      </LineStyle>
+    </Style>
+    <Folder>
+      <name>Tracks</name>
+      <Folder>
+        <snippet/>
+        <description>
+          <![CDATA[<table>
+            <tr><td><b>Distance</b>{dist}m</td></tr>
+            <tr><td><b>Start Time</b>{start}</td></tr>
+            <tr><td><b>End Time</b>{end}</td></tr>
+          </table>]]>
+        </description>
+        <TimeSpan>
+          <begin>{start}</begin>
+          <end>{end}</end>
+        </TimeSpan>
+        <Folder>
+          <name>Points</name>
+'''                    .format(
+                        now        = str(datetime.datetime.now()),
+                        start    = self.Points[0].DateTime.isoformat(),
+                        end        = self.Points[len(self.Points) - 1].DateTime.isoformat(),
+                        lat        = str(self.Points[0].Latitude),
+                        lng        = str(self.Points[0].Longitude),
+                        dist    = '%.1f' % (self.Points[len(self.Points) - 1].Distance),
+                    )
+                )
+            
+            for Point in self.Points:
+                FileOut.write('''\
+          <Placemark>
+            <snippet/>
+            <description><![CDATA[
+              <table>
+                <tr><td>Longitude: {lng}</td></tr>
+                <tr><td>Latitude: {lat}</td></tr>
+                <tr><td>Speed: {speed}km/h</td></tr>
+                <tr><td>Altitude: {alt}m</td></tr>
+                <tr><td>Heading: {dir}</td></tr>
+                <tr><td>Time: {time}</td></tr>
+              </table>
+            ]]></description>
+            <LookAt>
+              <longitude>{lng}</longitude>
+              <latitude>{lat}</latitude>
+              <tilt>66</tilt>
+            </LookAt>
+            <TimeStamp><when>{time}</when></TimeStamp>
+            <styleUrl>#track</styleUrl>
+            <Point>
+              <coordinates>{lng},{lat}</coordinates>
+            </Point>
+          </Placemark>
+'''					.format(
+						time	= Point.DateTime.isoformat(),
+						lat		= '%.8f' % (Point.Latitude,),
+						lng		= '%.8f' % (Point.Longitude,),
+						speed	= '%.1f' % (Point.Speed,),
+						alt		= '%.1f' % (Point.Altitude,),
+						dir		= '%.1f' % (Point.Bearing,),
+					)
+				)
+			
+			FileOut.write('''\
+        </Folder>
+        <Placemark>
+          <name>Path</name>
+          <styleUrl>#lineStyle</styleUrl>
+          <LineString>
+            <tessellate>1</tessellate>
+            <coordinates>
+''')
+			
+			for Point in self.Points:
+				FileOut.write('			  %.8f,%.8f\n' % (Point.Longitude, Point.Latitude))
+			
+			FileOut.write('''\
+            </coordinates>
+          </LineString>
+        </Placemark>
+      </Folder>
+    </Folder>
+  </Document>
+</kml>
+''')
+	
+	##########################################################################
 	# RaceChrono reader/writer
 	# 1: ULONG epoch 時刻 [ms]
 	# 2: ULONG 走行距離 [1/1000m]
@@ -464,7 +654,7 @@ class GpsLogClass:
 					Point.Latitude	= float(Param[3])
 					Point.Altitude	= float(Param[4])
 					Point.Speed		= float(Param[5])
-
+	
 	##########################################################################
 	# Points dumper
 	def Write_debug(self, FileName):
