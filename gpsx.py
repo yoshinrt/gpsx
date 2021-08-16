@@ -466,18 +466,18 @@ class GpsLogClass:
         </TimeSpan>
         <Folder>
           <name>Points</name>
-'''                    .format(
-                        now        = str(datetime.datetime.now()),
-                        start    = self.Points[0].DateTime.isoformat(),
-                        end        = self.Points[len(self.Points) - 1].DateTime.isoformat(),
-                        lat        = str(self.Points[0].Latitude),
-                        lng        = str(self.Points[0].Longitude),
-                        dist    = '%.1f' % (self.Points[len(self.Points) - 1].Distance),
-                    )
-                )
-            
-            for Point in self.Points:
-                FileOut.write('''\
+'''					.format(
+						now		= str(datetime.datetime.now()),
+						start	= self.Points[0].DateTime.isoformat(),
+						end		= self.Points[len(self.Points) - 1].DateTime.isoformat(),
+						lat		= str(self.Points[0].Latitude),
+						lng		= str(self.Points[0].Longitude),
+						dist	= '%.1f' % (self.Points[len(self.Points) - 1].Distance),
+					)
+				)
+			
+			for Point in self.Points:
+				FileOut.write('''\
           <Placemark>
             <snippet/>
             <description><![CDATA[
@@ -717,6 +717,23 @@ class GpsLogClass:
 		print("%d/%d" % (len(PointsNew), len(self.Points),))
 		self.Points = PointsNew
 	
+	#########################################################################
+	# 対応 format 取得
+	
+	@classmethod
+	def GetAvailableFormat(cls):
+		Format = [[], []]
+		
+		c = cls()
+		for key in c.FuncTbl.keys():
+			if c.FuncTbl[key][0]:
+				Format[0].append(key)
+			
+			if c.FuncTbl[key][1]:
+				Format[1].append(key)
+		
+		return Format
+
 ##############################################################################
 # process all file
 
@@ -754,7 +771,7 @@ def Convert(Arg):
 	
 	if Arg.cat:
 		GpsLog.Write(Arg.output_file, Arg.output_format)
-
+	
 ##############################################################################
 # main
 if __name__ == '__main__':
@@ -765,5 +782,7 @@ if __name__ == '__main__':
 	ArgParser.add_argument('-O', metavar = 'output_format', dest = 'output_format', help = 'output format')
 	ArgParser.add_argument('-o', metavar = 'output_file', dest = 'output_file', help = 'output file')
 	Arg = ArgParser.parse_args()
+	
+	print(GpsLogClass.GetAvailableFormat())
 	
 	Convert(Arg)

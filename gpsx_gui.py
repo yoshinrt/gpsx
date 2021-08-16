@@ -26,8 +26,6 @@ Builder.load_string('''
 				
 			Spinner:
 				id: input_format
-				text: 'auto'
-				values: 'auto', 'nmea', 'gpx', 'kml', 'vsd'
 				width: '100sp'
 				size_hint: None, 1.0
 				
@@ -54,8 +52,6 @@ Builder.load_string('''
 			
 			Spinner:
 				id: output_format
-				text: 'RaceChrono'
-				values: 'RaceChrono', 'nmea', 'gpx', 'kml', 'vsd'
 				width: '100sp'
 				size_hint: None, 1.0
 				
@@ -160,6 +156,16 @@ class MainWidget(Widget):
 		datetime.datetime.now().strftime("%Y%m%d_%H%M")
 	)
 	Log			= StringProperty('* GPS log converter\n')
+	
+	def __init__(self, **kwargs):
+		super(MainWidget, self).__init__(**kwargs)
+		FormatList = gpsx.GpsLogClass.GetAvailableFormat()
+		FormatList[0].insert(0, 'auto')
+		
+		self.ids['input_format'].text		= 'auto'
+		self.ids['input_format'].values		= FormatList[0]
+		self.ids['output_format'].text		= 'RaceChroho'
+		self.ids['output_format'].values	= FormatList[1]
 	
 	def InputButtonPressed(self):
 		self.popup = FileSelectPopup(
