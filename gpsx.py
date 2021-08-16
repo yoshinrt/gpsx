@@ -661,6 +661,62 @@ class GpsLogClass:
 		with smart_open(FileName, 'wt') as FileOut:
 			FileOut.write(str(self.Points).replace(',', '\n'))
 	
+	##########################################################################
+	# smart reduce point
+	def DistanceLine2Pix(self, p1, p2, p3):
+		x1 = self.Points[p1].x
+		y1 = self.Points[p1].y
+		px = self.Points[p2].x
+		py = self.Points[p2].y
+		x2 = self.Points[p3].x
+		y2 = self.Points[p3].y
+		
+		a = x2 - x1
+		b = y2 - y1
+		a2 = a * a
+		b2 = b * b
+		r2 = a2 + b2
+		tt = -(a * (x1 - px) + b * (y1 - py))
+		if tt < 0:
+			return (x1 - px) * (x1 - px) + (y1 - py) * (y1 - py)
+		if tt > r2:
+			return (x2 - px) * (x2 - px) + (y2 - py) * (y2 - py)
+		
+		f1 = a * (y1 - py) - b * (x1 - px)
+		return f1 * f1 / r2
+	
+	def ReduceSmart(self):
+		self.GenXY()
+		
+		st = 0
+		while st < len(self.Points) - 2:
+			ed = st + 2
+			del_ok = -1
+			
+			for ed in range(st + 2, len(self.Points)):
+				md = (st + ed) // 2
+				
+				dist = self.Distance(st, ed)
+				if dist < 5 or self.DistanceLine2Pix(st, md, ed) < 5:
+					del_ok = ed
+				else:
+					break
+			
+			if del_ok > 0:
+				for i in range(st, ed):
+					self.Points[i].DateTime = None
+				st = del_ok
+			else:
+				st += 1
+		
+		PointsNew = []
+		for Point in self.Points:
+			if Point.DateTime:
+				PointsNew.append(Point)
+		
+		print("%d/%d" % (len(PointsNew), len(self.Points),))
+		self.Points = PointsNew
+	
 ##############################################################################
 # process all file
 
