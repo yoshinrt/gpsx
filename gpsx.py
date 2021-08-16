@@ -33,16 +33,17 @@ def smart_open(filename = None, mode = 'r'):
 ##############################################################################
 
 class PointClass:
-	DateTime	= None
-	Longitude	= None
-	Latitude	= None
-	Altitude	= None
-	Speed		= None
-	Bearing		= None
-	Distance	= None
 	
-	x			= None
-	y			= None
+	def __init__(self):
+		self.DateTime	= None
+		self.Longitude	= None
+		self.Latitude	= None
+		self.Altitude	= None
+		self.Speed		= None
+		self.Bearing	= None
+		self.Distance	= None
+		self.x			= None
+		self.y			= None
 	
 	def __repr__(self):
 		return '%s [%10.6f %10.6f] (%.1f %.1f) %5.1fkm/h %5.1fdeg %.1fm' % (
@@ -57,11 +58,17 @@ class PointClass:
 
 ##############################################################################
 
+class GpsxException(Exception):
+	pass
+
+##############################################################################
+
 class GpsLogClass:
-	Points = []
 	
 	def __init__(self):
-		GpsLogClass.FuncTbl = {
+		self.Points = []
+		
+		self.FuncTbl = {
 			'nmea':			(self.Read_nmea,		self.Write_nmea),
 			'gpx':			(self.Read_gpx,			self.Write_gpx),
 			'kml':			(self.Read_kml,			self.Write_kml),
@@ -170,13 +177,13 @@ class GpsLogClass:
 		if format in self.FuncTbl:
 			return format
 		
-		raise Exception('Unknown format: %s format=%s' % (str(file), str(format)))
+		raise GpsxException('Unknown format: %s format=%s' % (str(file), str(format)))
 	
 	def Read(self, file, format):
 		format = self.GetFormat(file, format)
 		
 		if format not in self.FuncTbl or self.FuncTbl[format][0] is None:
-			raise Exception('Format %s input not available: %s ' % (str(format), str(file)))
+			raise GpsxException('Format %s input not available: %s ' % (str(format), str(file)))
 		
 		self.FuncTbl[format][0](file)
 	
@@ -184,7 +191,7 @@ class GpsLogClass:
 		format = self.GetFormat(file, format)
 		
 		if self.FuncTbl[format][1] is None:
-			raise Exception('Format %s output not available: %s ' % (str(format), str(file)))
+			raise GpsxException('Format %s output not available: %s ' % (str(format), str(file)))
 		
 		self.FuncTbl[format][1](file)
 	
@@ -550,7 +557,7 @@ class GpsLogClass:
 	
 	def Read_RaceChrono(self, DirName):
 		if DirName == '-':
-			raise Exception("RaceChrono reader can't input from stdin")
+			raise GpsxException("RaceChrono reader can't input from stdin")
 		
 		with open(DirName + '/channel_1_100_0_1_1', 'rb') as fhTime:
 			with open(DirName + '/channel_1_100_0_2_1', 'rb') as fhDistance:
@@ -596,7 +603,7 @@ class GpsLogClass:
 	
 	def Write_RaceChrono(self, DirName):
 		if DirName == '-':
-			raise Exception("RaceChrono writer can't output to stdout")
+			raise GpsxException("RaceChrono writer can't output to stdout")
 		
 		# dir 作成
 		os.makedirs(DirName, exist_ok=True)
@@ -744,7 +751,7 @@ def Convert(Arg):
 	if Arg.output_file:
 		Arg.cat = True
 	elif not Arg.output_format:
-		raise Exception('Output format not specified')
+		raise GpsxException('Output format not specified')
 	
 	if not hasattr(Arg, 'cat'):
 		Arg.cat = False
@@ -782,7 +789,5 @@ if __name__ == '__main__':
 	ArgParser.add_argument('-O', metavar = 'output_format', dest = 'output_format', help = 'output format')
 	ArgParser.add_argument('-o', metavar = 'output_file', dest = 'output_file', help = 'output file')
 	Arg = ArgParser.parse_args()
-	
-	print(GpsLogClass.GetAvailableFormat())
 	
 	Convert(Arg)

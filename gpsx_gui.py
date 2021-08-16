@@ -37,7 +37,6 @@ Builder.load_string('''
 			
 		TextInput:
 			id: InputFile
-			text: root.InputFile
 			height: '100sp'
 			size_hint: 1.0, None
 		
@@ -62,7 +61,7 @@ Builder.load_string('''
 				on_press: root.OutputButtonPressed()
 			
 		TextInput:
-			text: root.OutputFile
+			id: OutputFile
 			height: '100sp'
 			size_hint: 1.0, None
 		
@@ -144,17 +143,13 @@ class FileSelectPopup(Popup):
 			self.OnCancel(path, selection)
 
 class SimpleArg():
-	input_file		= []
-	input_format	= None
-	output_file		= None
-	output_format	= None
+	def __init__(self):
+		self.input_file		= []
+		self.input_format	= None
+		self.output_file	= None
+		self.output_format	= None
 
 class MainWidget(Widget):
-	InputFile	= StringProperty('/sdcard/OneDrive/vsd/log/vsd.log')
-	OutputFile	= StringProperty(
-		'/sdcard/Android/data/com.racechrono.app/files/sessions/session_' +
-		datetime.datetime.now().strftime("%Y%m%d_%H%M")
-	)
 	Log			= StringProperty('* GPS log converter\n')
 	
 	def __init__(self, **kwargs):
@@ -162,14 +157,17 @@ class MainWidget(Widget):
 		FormatList = gpsx.GpsLogClass.GetAvailableFormat()
 		FormatList[0].insert(0, 'auto')
 		
+		self.ids['InputFile'].text			= '/sdcard/OneDrive/vsd/log/vsd.log'
+		self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/Android/data/com.racechrono.app/files/sessions/session_%Y%m%d_%H%M')
+		
 		self.ids['input_format'].text		= 'auto'
 		self.ids['input_format'].values		= FormatList[0]
-		self.ids['output_format'].text		= 'RaceChroho'
+		self.ids['output_format'].text		= 'RaceChrono'
 		self.ids['output_format'].values	= FormatList[1]
 	
 	def InputButtonPressed(self):
 		self.popup = FileSelectPopup(
-			Path		= os.path.dirname(self.InputFile.split('\n')[0]),
+			Path		= os.path.dirname(self.ids['InputFile'].text.split('\n')[0]),
 			size_hint	= (0.9, 0.9),
 			Multi		= True,
 			OnOk		= self.OnInputOk
@@ -178,16 +176,16 @@ class MainWidget(Widget):
 	
 	def OnInputOk(self, path, selection):
 		if selection is None:
-			self.InputFile = path + '/'
+			self.ids['InputFile'].text = path + '/'
 		else:
 			selection.sort()
-			self.InputFile = '\n'.join(selection)
+			self.ids['InputFile'].text = '\n'.join(selection)
 		
-		self.Log += '* Input file selected: ' + self.InputFile + '\n'
+		self.Log += '* Input file selected: ' + self.ids['InputFile'].text + '\n'
 	
 	def OutputButtonPressed(self):
 		self.popup = FileSelectPopup(
-			Path		= os.path.dirname(self.OutputFile),
+			Path		= os.path.dirname(self.ids['OutputFile'].text),
 			size_hint	= (0.9, 0.9),
 			OnOk		= self.OnOutputOk
 		)
@@ -195,16 +193,16 @@ class MainWidget(Widget):
 	
 	def OnOutputOk(self, path, selection):
 		if selection is None:
-			self.OutputFile = path + '/'
+			self.ids['OutputFile'].text = path + '/'
 		else:
-			self.OutputFile = selection[0]
+			self.ids['OutputFile'].text = selection[0]
 		
-		self.Log += '* Output file selected: ' + self.OutputFile + '\n'
+		self.Log += '* Output file selected: ' + self.ids['OutputFile'].text + '\n'
 	
 	def ConvertButtonPressed(self):
 		Arg = SimpleArg()
 		
-		for file in self.InputFile.split('\n'):
+		for file in self.ids['InputFile'].text.split('\n'):
 			if len(file) > 0:
 				Arg.input_file.append(file)
 		Arg.input_format = self.ids['input_format'].text
@@ -212,7 +210,8 @@ class MainWidget(Widget):
 		if Arg.input_format == 'auto':
 			Arg.input_format = None
 		
-		Arg.output_file = self.OutputFile
+		Arg.output_file = self.ids['OutputFile'].text
+		
 		Arg.output_format = self.ids['output_format'].text
 		if Arg.output_format == 'auto':
 			Arg.output_format = None
@@ -220,13 +219,15 @@ class MainWidget(Widget):
 		self.Log += ('* Start log converting...\n' +
 			'  in: %s format=%s\n' +
 			'  out: %s format=%s\n') % (
-				Arg.input_file, Arg.input_format,
+				Arg.input_file,  Arg.input_format,
 				Arg.output_file, Arg.output_format
 			)
 		
-		gpsx.Convert(Arg)
-		
-		self.Log += '* done.\n'
+		try:
+			gpsx.Convert(Arg)
+			self.Log += '* done.\n'
+		except Exception as Error:
+			self.Log += '* Error: ' + str(Error) + '\n'
 	
 class MyApp(App):
 	def build(self):
