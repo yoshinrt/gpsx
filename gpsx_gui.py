@@ -169,7 +169,7 @@ class MainWidget(Widget):
 	
 	def InputButtonPressed(self):
 		self.popup = FileSelectPopup(
-			Path		= os.path.dirname(self.InputFile),
+			Path		= os.path.dirname(self.InputFile.split('\n')[0]),
 			size_hint	= (0.9, 0.9),
 			Multi		= True,
 			OnOk		= self.OnInputOk
@@ -180,6 +180,7 @@ class MainWidget(Widget):
 		if selection is None:
 			self.InputFile = path + '/'
 		else:
+			selection.sort()
 			self.InputFile = '\n'.join(selection)
 		
 		self.Log += '* Input file selected: ' + self.InputFile + '\n'
