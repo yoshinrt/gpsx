@@ -7,6 +7,8 @@ from kivy.uix.widget import Widget
 from kivy.uix.popup import Popup
 from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
 from kivy.uix.popup import Popup
+from kivy.clock import Clock
+
 import datetime
 import os
 import gpsx
@@ -79,6 +81,7 @@ Builder.load_string('''
 
 <FileSelectPopup>:
 	title: root.Path
+	size_hint: 0.9, 0.9
 	
 	BoxLayout:
 		orientation: 'vertical'
@@ -88,7 +91,7 @@ Builder.load_string('''
 			id: FileChooser
 			path: root.Path
 			multiselect: root.Multi
-			on_touch_down: root.title = self.path
+			on_touch_up: root.UpdatePathTimer()
 		
 		BoxLayout:
 			orientation: 'horizontal'
@@ -133,6 +136,12 @@ class FileSelectPopup(Popup):
 		self.dismiss()
 		if self.OnCancel:
 			self.OnCancel(path, selection)
+	
+	def UpdatePathTimer(self):
+		Clock.schedule_once(self.UpdatePath, 0.2)
+	
+	def UpdatePath(self, dt):
+		self.Path = self.ids['FileChooser'].path
 
 class SimpleArg():
 	def __init__(self):
@@ -166,7 +175,6 @@ class MainWidget(Widget):
 	def InputButtonPressed(self):
 		self.popup = FileSelectPopup(
 			Path		= os.path.dirname(self.ids['InputFile'].text.split('\n')[0]),
-			size_hint	= (0.9, 0.9),
 			Multi		= True,
 			OnOk		= self.OnInputOk
 		)
@@ -184,7 +192,6 @@ class MainWidget(Widget):
 	def OutputButtonPressed(self):
 		self.popup = FileSelectPopup(
 			Path		= os.path.dirname(self.ids['OutputFile'].text),
-			size_hint	= (0.9, 0.9),
 			OnOk		= self.OnOutputOk
 		)
 		self.popup.open()
