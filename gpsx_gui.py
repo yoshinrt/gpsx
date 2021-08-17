@@ -87,11 +87,13 @@ Builder.load_string('''
 		orientation: 'vertical'
 		size: root.size
 		
-		FileChooserIconView:
+		FileChooser:
 			id: FileChooser
 			path: root.Path
 			multiselect: root.Multi
 			on_touch_up: root.UpdatePathTimer()
+			FileChooserIconLayout
+			FileChooserListLayout
 		
 		BoxLayout:
 			orientation: 'horizontal'
@@ -109,6 +111,10 @@ Builder.load_string('''
 			Button:
 				text: 'Cancel'
 				on_press: root.CancelButtonPressed()
+			
+			Button:
+				text: 'List'
+				on_press: (FileChooser.view_mode, self.text) = ('list', 'Icon') if FileChooser.view_mode != 'list' else ('icon', 'List')
 ''')
 
 
