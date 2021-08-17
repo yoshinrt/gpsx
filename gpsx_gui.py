@@ -149,8 +149,12 @@ class MainWidget(Widget):
 		FormatList = gpsx.GpsLogClass.GetAvailableFormat()
 		FormatList[0].insert(0, 'auto')
 		
-		self.ids['InputFile'].text			= '/sdcard/OneDrive/vsd/log/vsd.log'
-		self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/Android/data/com.racechrono.app/files/sessions/session_%Y%m%d_%H%M')
+		if os.environ.get('ANDROID_ROOT'):
+			self.ids['InputFile'].text			= '/sdcard/OneDrive/vsd/log/vsd.log'
+			self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/Android/data/com.racechrono.app/files/sessions/session_%Y%m%d_%H%M')
+		else:
+			self.ids['InputFile'].text			= os.environ.get('HOME') + '/'
+			self.ids['OutputFile'].text			= os.environ.get('HOME') + '/'
 		
 		self.ids['input_format'].text		= 'auto'
 		self.ids['input_format'].values		= FormatList[0]
@@ -222,6 +226,8 @@ class MainWidget(Widget):
 			self.Log += '* Error: ' + str(Error) + '\n'
 	
 class MyApp(App):
+	title = 'GPSX - gps log converter'
+	
 	def build(self):
 		return MainWidget()
 
