@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 ''' kv sample3 '''
 from kivy.app import App
 from kivy.lang import Builder
@@ -6,7 +8,7 @@ from kivy.uix.popup import Popup
 from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
 from kivy.uix.popup import Popup
 import datetime
-from os import path
+import os
 import gpsx
 
 Builder.load_string('''
@@ -20,21 +22,16 @@ Builder.load_string('''
 			height: '50sp'
 			size_hint: 1.0, None
 			
-			Label:
-				text: 'Input file'
-				size_hint: 1.0, 1.0
-				
+			Button:
+				text: 'Input file...'
+				size_hint: 1, 1
+				on_press: root.InputButtonPressed()
+			
 			Spinner:
 				id: input_format
 				width: '100sp'
 				size_hint: None, 1.0
 				
-			Button:
-				text: '...'
-				width: '50sp'
-				size_hint: None, 1.0
-				on_press: root.InputButtonPressed()
-			
 		TextInput:
 			id: InputFile
 			height: '100sp'
@@ -45,28 +42,23 @@ Builder.load_string('''
 			height: '50sp'
 			size_hint: 1.0, None
 			
-			Label:
-				text: 'Output file'
-				size_hint: 1.0, 1.0
+			Button:
+				text: 'Output file...'
+				size_hint: 1, 1
+				on_press: root.OutputButtonPressed()
 			
 			Spinner:
 				id: output_format
 				width: '100sp'
 				size_hint: None, 1.0
 				
-			Button:
-				text: '...'
-				width: '50sp'
-				size_hint: None, 1.0
-				on_press: root.OutputButtonPressed()
-			
 		TextInput:
 			id: OutputFile
 			height: '100sp'
 			size_hint: 1.0, None
 		
 		Button:
-			hight: '50sp'
+			height: '50sp'
 			size_hint: 1, None
 			text: 'Convert'
 			on_press: root.ConvertButtonPressed()
