@@ -186,6 +186,8 @@ class GpsLogClass:
 			raise GpsxException('Format %s input not available: %s ' % (str(format), str(file)))
 		
 		self.FuncTbl[format][0](file)
+		if len(self.Points) == 0:
+			raise GpsxException('No input read: %s' % (file,))
 	
 	def Write(self, file, format):
 		format = self.GetFormat(file, format)
