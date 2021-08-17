@@ -47,7 +47,7 @@ class PointClass:
 	
 	def __repr__(self):
 		return '%s [%10.6f %10.6f] (%.1f %.1f) %5.1fkm/h %5.1fdeg %.1fm' % (
-			self.DateTime.isoformat() if self.DateTime is not None else 'None',
+			self.DateTime.isoformat(timespec='milliseconds') if self.DateTime is not None else 'None',
 			self.Longitude, self.Latitude,
 			self.x if self.x is not None else -1,
 			self.y if self.y is not None else -1,
@@ -267,21 +267,26 @@ class GpsLogClass:
 	
 	def Write_nmea(self, FileName):
 		with smart_open(FileName, 'wt') as FileOut:
+			
+			self.GenSpeed()
+			self.GenBearing()
+			
 			for Point in self.Points:
 				Time = Point.DateTime.strftime('%H%M%S') + ('.%03d' % (Point.DateTime.microsecond // 1000,))
-				Lat = self.NmeaLatLng2Str(Point.Latitude)  + ',N' if Point.Latitude  >= 0 else ',S'
-				Lng = self.NmeaLatLng2Str(Point.Longitude) + ',E' if Point.Longitude >= 0 else ',W'
+				Lat = '%.8f' % (Point.Latitude,)  + ',N' if Point.Latitude  >= 0 else ',S'
+				Lng = '%.8f' % (Point.Longitude,) + ',E' if Point.Longitude >= 0 else ',W'
 				
 				s = '$GPRMC,%s,A,%s,%s,%s,%s,%s,,,A' % (
 					Time, Lat, Lng,
-					str(Point.Speed / 1.852) if Point.Speed is not None else '',
-					str(Point.Bearing) if Point.Bearing is not None else '',
+					'%.3f' % (Point.Speed / 1.852,) if Point.Speed is not None else '',
+					'%.2f' % (Point.Bearing,) if Point.Bearing is not None else '',
 					Point.DateTime.strftime('%d%m%y')
 				)
 				FileOut.write(s + self.NmeaGenChksum(s) + '\n')
 				
 				s = '$GPGGA,%s,%s,%s,1,08,1.0,%s,M,,,,' % (
-					Time, Lat, Lng, str(Point.Altitude)
+					Time, Lat, Lng,
+					'%.2f' % (Point.Altitude,) if Point.Altitude is not None else '',
 				)
 				FileOut.write(s + self.NmeaGenChksum(s) + '\n')
 	
@@ -329,7 +334,7 @@ class GpsLogClass:
 			
 			FileOut.write(
 				'<?xml version="1.0"?><gpx version="1.0" creator="GPSLogger - http://gpslogger.mendhak.com/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.topografix.com/GPX/1/0" xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd"><time>%s</time><bounds /><trk><trkseg>\n' % (
-					self.Points[0].DateTime.isoformat()
+					self.Points[0].DateTime.isoformat(timespec='milliseconds')
 				)
 			)
 			
@@ -339,9 +344,9 @@ class GpsLogClass:
 			
 			for Point in self.Points:
 				FileOut.write(
-					'<trkpt lat="%s" lon="%s"><ele>%s</ele><course>%s</course><speed>%s</speed><time>%s</time></trkpt>\n' % (
-						str(Point.Latitude), str(Point.Longitude), str(Point.Altitude),
-						str(Point.Bearing), str(Point.Speed / 3.6), Point.DateTime.isoformat()
+					'<trkpt lat="%.8f" lon="%.8f"><ele>%.3f</ele><course>%.2f</course><speed>%.3f</speed><time>%s</time></trkpt>\n' % (
+						Point.Latitude, Point.Longitude, Point.Altitude,
+						Point.Bearing, Point.Speed / 3.6, Point.DateTime.isoformat(timespec='milliseconds')
 					)
 				)
 			
@@ -381,165 +386,165 @@ class GpsLogClass:
 			FileOut.write('''\
 <?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
-    xmlns:gx="http://www.google.com/kml/ext/2.2">
-  <Document>
-    <name>GPS device</name>
-    <snippet>Created {now}</snippet>
-    <LookAt>
-      <gx:TimeSpan>
-        <begin>{start}</begin>
-        <end>{end}</end>
-      </gx:TimeSpan>
-      <longitude>kml</longitude>
-      <latitude>{lat}</latitude>
-      <range>1300.000000</range>
-    </LookAt>
+		xmlns:gx="http://www.google.com/kml/ext/2.2">
+	<Document>
+		<name>GPS device</name>
+		<snippet>Created {now}</snippet>
+		<LookAt>
+			<gx:TimeSpan>
+				<begin>{start}</begin>
+				<end>{end}</end>
+			</gx:TimeSpan>
+			<longitude>kml</longitude>
+			<latitude>{lat}</latitude>
+			<range>1300.000000</range>
+		</LookAt>
 <!-- Normal track style -->
-    <Style id="track_n">
-      <IconStyle>
-        <scale>.5</scale>
-        <Icon>
-          <href>http://earth.google.com/images/kml-icons/track-directional/track-none.png</href>
-        </Icon>
-      </IconStyle>
-      <LabelStyle>
-        <scale>0</scale>
-      </LabelStyle>
-    </Style>
+		<Style id="track_n">
+			<IconStyle>
+				<scale>.5</scale>
+				<Icon>
+					<href>http://earth.google.com/images/kml-icons/track-directional/track-none.png</href>
+				</Icon>
+			</IconStyle>
+			<LabelStyle>
+				<scale>0</scale>
+			</LabelStyle>
+		</Style>
 <!-- Highlighted track style -->
-    <Style id="track_h">
-      <IconStyle>
-        <scale>1.2</scale>
-        <Icon>
-          <href>http://earth.google.com/images/kml-icons/track-directional/track-none.png</href>
-        </Icon>
-      </IconStyle>
-    </Style>
-    <StyleMap id="track">
-      <Pair>
-        <key>normal</key>
-        <styleUrl>#track_n</styleUrl>
-      </Pair>
-      <Pair>
-        <key>highlight</key>
-        <styleUrl>#track_h</styleUrl>
-      </Pair>
-    </StyleMap>
+		<Style id="track_h">
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>http://earth.google.com/images/kml-icons/track-directional/track-none.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
+		<StyleMap id="track">
+			<Pair>
+				<key>normal</key>
+				<styleUrl>#track_n</styleUrl>
+			</Pair>
+			<Pair>
+				<key>highlight</key>
+				<styleUrl>#track_h</styleUrl>
+			</Pair>
+		</StyleMap>
 <!-- Normal waypoint style -->
-    <Style id="waypoint_n">
-      <IconStyle>
-        <Icon>
-          <href>http://maps.google.com/mapfiles/kml/pal4/icon61.png</href>
-        </Icon>
-      </IconStyle>
-    </Style>
+		<Style id="waypoint_n">
+			<IconStyle>
+				<Icon>
+					<href>http://maps.google.com/mapfiles/kml/pal4/icon61.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
 <!-- Highlighted waypoint style -->
-    <Style id="waypoint_h">
-      <IconStyle>
-        <scale>1.2</scale>
-        <Icon>
-          <href>http://maps.google.com/mapfiles/kml/pal4/icon61.png</href>
-        </Icon>
-      </IconStyle>
-    </Style>
-    <StyleMap id="waypoint">
-      <Pair>
-        <key>normal</key>
-        <styleUrl>#waypoint_n</styleUrl>
-      </Pair>
-      <Pair>
-        <key>highlight</key>
-        <styleUrl>#waypoint_h</styleUrl>
-      </Pair>
-    </StyleMap>
-    <Style id="lineStyle">
-      <LineStyle>
-        <color>FFFFFF00</color>
-        <width>1</width>
-      </LineStyle>
-    </Style>
-    <Folder>
-      <name>Tracks</name>
-      <Folder>
-        <snippet/>
-        <description>
-          <![CDATA[<table>
-            <tr><td><b>Distance</b>{dist}m</td></tr>
-            <tr><td><b>Start Time</b>{start}</td></tr>
-            <tr><td><b>End Time</b>{end}</td></tr>
-          </table>]]>
-        </description>
-        <TimeSpan>
-          <begin>{start}</begin>
-          <end>{end}</end>
-        </TimeSpan>
-        <Folder>
-          <name>Points</name>
+		<Style id="waypoint_h">
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>http://maps.google.com/mapfiles/kml/pal4/icon61.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
+		<StyleMap id="waypoint">
+			<Pair>
+				<key>normal</key>
+				<styleUrl>#waypoint_n</styleUrl>
+			</Pair>
+			<Pair>
+				<key>highlight</key>
+				<styleUrl>#waypoint_h</styleUrl>
+			</Pair>
+		</StyleMap>
+		<Style id="lineStyle">
+			<LineStyle>
+				<color>FFFFFF00</color>
+				<width>1</width>
+			</LineStyle>
+		</Style>
+		<Folder>
+			<name>Tracks</name>
+			<Folder>
+				<snippet/>
+				<description>
+					<![CDATA[<table>
+						<tr><td><b>Distance</b>{dist}m</td></tr>
+						<tr><td><b>Start Time</b>{start}</td></tr>
+						<tr><td><b>End Time</b>{end}</td></tr>
+					</table>]]>
+				</description>
+				<TimeSpan>
+					<begin>{start}</begin>
+					<end>{end}</end>
+				</TimeSpan>
+				<Folder>
+					<name>Points</name>
 '''					.format(
 						now		= str(datetime.datetime.now()),
-						start	= self.Points[0].DateTime.isoformat(),
-						end		= self.Points[len(self.Points) - 1].DateTime.isoformat(),
-						lat		= str(self.Points[0].Latitude),
-						lng		= str(self.Points[0].Longitude),
-						dist	= '%.1f' % (self.Points[len(self.Points) - 1].Distance),
+						start	= self.Points[0].DateTime.isoformat(timespec='milliseconds'),
+						end		= self.Points[len(self.Points) - 1].DateTime.isoformat(timespec='milliseconds'),
+						lat		= '%.8f' % (self.Points[0].Latitude,),
+						lng		= '%.8f' % (self.Points[0].Longitude,),
+						dist	= '%.2f' % (self.Points[len(self.Points) - 1].Distance),
 					)
 				)
 			
 			for Point in self.Points:
 				FileOut.write('''\
-          <Placemark>
-            <snippet/>
-            <description><![CDATA[
-              <table>
-                <tr><td>Longitude: {lng}</td></tr>
-                <tr><td>Latitude: {lat}</td></tr>
-                <tr><td>Speed: {speed}km/h</td></tr>
-                <tr><td>Altitude: {alt}m</td></tr>
-                <tr><td>Heading: {dir}</td></tr>
-                <tr><td>Time: {time}</td></tr>
-              </table>
-            ]]></description>
-            <LookAt>
-              <longitude>{lng}</longitude>
-              <latitude>{lat}</latitude>
-              <tilt>66</tilt>
-            </LookAt>
-            <TimeStamp><when>{time}</when></TimeStamp>
-            <styleUrl>#track</styleUrl>
-            <Point>
-              <coordinates>{lng},{lat}</coordinates>
-            </Point>
-          </Placemark>
+					<Placemark>
+						<snippet/>
+						<description><![CDATA[
+							<table>
+								<tr><td>Longitude: {lng}</td></tr>
+								<tr><td>Latitude: {lat}</td></tr>
+								<tr><td>Speed: {speed}km/h</td></tr>
+								<tr><td>Altitude: {alt}m</td></tr>
+								<tr><td>Heading: {dir}</td></tr>
+								<tr><td>Time: {time}</td></tr>
+							</table>
+						]]></description>
+						<LookAt>
+							<longitude>{lng}</longitude>
+							<latitude>{lat}</latitude>
+							<tilt>66</tilt>
+						</LookAt>
+						<TimeStamp><when>{time}</when></TimeStamp>
+						<styleUrl>#track</styleUrl>
+						<Point>
+							<coordinates>{lng},{lat}</coordinates>
+						</Point>
+					</Placemark>
 '''					.format(
-						time	= Point.DateTime.isoformat(),
+						time	= Point.DateTime.isoformat(timespec='milliseconds'),
 						lat		= '%.8f' % (Point.Latitude,),
 						lng		= '%.8f' % (Point.Longitude,),
-						speed	= '%.1f' % (Point.Speed,),
-						alt		= '%.1f' % (Point.Altitude,),
-						dir		= '%.1f' % (Point.Bearing,),
+						speed	= '%.3f' % (Point.Speed,),
+						alt		= '%.3f' % (Point.Altitude,),
+						dir		= '%.2f' % (Point.Bearing,),
 					)
 				)
 			
 			FileOut.write('''\
-        </Folder>
-        <Placemark>
-          <name>Path</name>
-          <styleUrl>#lineStyle</styleUrl>
-          <LineString>
-            <tessellate>1</tessellate>
-            <coordinates>
+				</Folder>
+				<Placemark>
+					<name>Path</name>
+					<styleUrl>#lineStyle</styleUrl>
+					<LineString>
+						<tessellate>1</tessellate>
+						<coordinates>
 ''')
 			
 			for Point in self.Points:
-				FileOut.write('			  %.8f,%.8f\n' % (Point.Longitude, Point.Latitude))
+				FileOut.write('							%.8f,%.8f\n' % (Point.Longitude, Point.Latitude))
 			
 			FileOut.write('''\
-            </coordinates>
-          </LineString>
-        </Placemark>
-      </Folder>
-    </Folder>
-  </Document>
+						</coordinates>
+					</LineString>
+				</Placemark>
+			</Folder>
+		</Folder>
+	</Document>
 </kml>
 ''')
 	
