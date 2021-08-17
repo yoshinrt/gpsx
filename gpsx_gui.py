@@ -148,17 +148,19 @@ class MainWidget(Widget):
 		super(MainWidget, self).__init__(**kwargs)
 		FormatList = gpsx.GpsLogClass.GetAvailableFormat()
 		FormatList[0].insert(0, 'auto')
+		FormatList[1].insert(0, 'auto')
 		
 		if os.environ.get('ANDROID_ROOT'):
 			self.ids['InputFile'].text			= '/sdcard/OneDrive/vsd/log/vsd.log'
 			self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/Android/data/com.racechrono.app/files/sessions/session_%Y%m%d_%H%M')
+			self.ids['output_format'].text		= 'RaceChrono'
 		else:
 			self.ids['InputFile'].text			= os.environ.get('HOME') + '/'
 			self.ids['OutputFile'].text			= os.environ.get('HOME') + '/'
+			self.ids['output_format'].text		= 'auto'
 		
 		self.ids['input_format'].text		= 'auto'
 		self.ids['input_format'].values		= FormatList[0]
-		self.ids['output_format'].text		= 'RaceChrono'
 		self.ids['output_format'].values	= FormatList[1]
 	
 	def InputButtonPressed(self):
