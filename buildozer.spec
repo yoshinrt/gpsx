@@ -1,8 +1,8 @@
 [app]
 
-title = Test App
-package.name = testapp
-package.domain = org.test
+title = GPSX
+package.name = gpsx
+package.domain = jp.dds
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas

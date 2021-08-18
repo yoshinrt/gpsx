@@ -15,7 +15,6 @@ jobs:
         uses: ArtemSBulgakov/buildozer-action@v1
         id: buildozer
         with:
-          workdir: test_app
           buildozer_version: stable
 
       - name: Upload artifacts
@@ -23,3 +22,4 @@ jobs:
         with:
           name: package
           path: ${{ steps.buildozer.outputs.filename }}
+
