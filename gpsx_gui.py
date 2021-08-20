@@ -3,7 +3,7 @@
 ''' kv sample3 '''
 from kivy.app import App
 from kivy.lang import Builder
-from kivy.uix.widget import Widget
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.popup import Popup
 from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
 from kivy.uix.popup import Popup
@@ -15,67 +15,71 @@ import gpsx
 
 Builder.load_string('''
 <MainWidget>:
+	orientation: 'vertical'
+	size: root.size
+	
 	BoxLayout:
-		orientation: 'vertical'
-		size: root.size
-		
-		BoxLayout:
-			orientation: 'horizontal'
-			height: '50sp'
-			size_hint: 1.0, None
-			
-			Button:
-				text: 'Input file...'
-				size_hint: 1, 1
-				on_press: root.InputButtonPressed()
-			
-			Spinner:
-				id: input_format
-				width: '100sp'
-				size_hint: None, 1.0
-				
-		TextInput:
-			id: InputFile
-			height: '100sp'
-			size_hint: 1.0, None
-		
-		BoxLayout:
-			orientation: 'horizontal'
-			height: '50sp'
-			size_hint: 1.0, None
-			
-			Button:
-				text: 'Output file...'
-				size_hint: 1, 1
-				on_press: root.OutputButtonPressed()
-			
-			Spinner:
-				id: output_format
-				width: '100sp'
-				size_hint: None, 1.0
-				
-		TextInput:
-			id: OutputFile
-			height: '100sp'
-			size_hint: 1.0, None
+		orientation: 'horizontal'
+		height: '50sp'
+		size_hint: 1.0, None
 		
 		Button:
-			height: '50sp'
-			size_hint: 1, None
-			text: 'Convert'
-			on_press: root.ConvertButtonPressed()
+			text: 'Input file...'
+			size_hint: 1, 1
+			on_press: root.InputButtonPressed()
 		
-		Label:
-			text: 'Log'
-			height: '30sp'
-			size_hint: 1.0, None
-			halign: 'left'
-			text_size: self.size
+		Spinner:
+			id: input_format
+			width: '100sp'
+			size_hint: None, 1.0
+			
+	TextInput:
+		id: InputFile
+		height: '100sp'
+		size_hint: 1.0, None
+	
+	BoxLayout:
+		orientation: 'horizontal'
+		height: '50sp'
+		size_hint: 1.0, None
 		
+		Button:
+			text: 'Output file...'
+			size_hint: 1, 1
+			on_press: root.OutputButtonPressed()
+		
+		Spinner:
+			id: output_format
+			width: '100sp'
+			size_hint: None, 1.0
+			
+	TextInput:
+		id: OutputFile
+		height: '100sp'
+		size_hint: 1.0, None
+	
+	Button:
+		height: '50sp'
+		size_hint: 1, None
+		text: 'Convert'
+		on_press: root.ConvertButtonPressed()
+	
+	Label:
+		text: 'Log'
+		height: '30sp'
+		size_hint: 1.0, None
+		halign: 'left'
+		text_size: self.size
+	
+	ScrollView:
 		TextInput:
 			text: root.Log
+			text_size: self.width, self.height
+			height: self.minimum_height
+			size_hint_y: None
+			halign: 'left'
+			valign: 'top'
 			readonly: True
-			size_hint: 1.0, 1.0
 			foreground_color: 1, 1, 1, 1
 			background_color: 0, 0, 0, 1
 
@@ -156,7 +160,7 @@ class SimpleArg():
 		self.output_file	= None
 		self.output_format	= None
 
-class MainWidget(Widget):
+class MainWidget(BoxLayout):
 	Log			= StringProperty('* GPS log converter\n')
 	
 	def __init__(self, **kwargs):
