@@ -169,6 +169,9 @@ class MainWidget(Widget):
 			self.ids['InputFile'].text			= '/sdcard/OneDrive/vsd/log/vsd.log'
 			self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/Android/data/com.racechrono.app/files/sessions/session_%Y%m%d_%H%M')
 			self.ids['output_format'].text		= 'RaceChrono'
+			
+			from android.permissions import request_permissions, Permission
+			request_permissions([Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE])
 		else:
 			self.ids['InputFile'].text			= os.environ.get('HOME') + '/'
 			self.ids['OutputFile'].text			= os.environ.get('HOME') + '/'
