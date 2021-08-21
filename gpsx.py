@@ -68,6 +68,11 @@ class GpsLogClass:
 	def __init__(self):
 		self.Points = []
 		
+		self.NoAltitude	= 0
+		self.NoSpeed	= 0
+		self.NoBearing	= 0
+		self.NoDistance	= 0
+		
 		self.FuncTbl = {
 			'nmea':			(self.Read_nmea,		self.Write_nmea),
 			'gpx':			(self.Read_gpx,			self.Write_gpx),
@@ -120,34 +125,49 @@ class GpsLogClass:
 		return deg if deg >= 0 else deg + 360
 	
 	##########################################################################
+	# Point 追加
+	def Append(self, Point):
+		
+		if Point.DateTime is None or Point.Longitude is None or Point.Latitude is None:
+			return
+		
+		if Point.Speed    is None: self.NoSpeed    |= 1
+		if Point.Altitude is None: self.NoAltitude |= 1
+		if Point.Bearing  is None: self.NoBearing  |= 1
+		if Point.Distance is None: self.NoDistance |= 1
+		
+		self.Points.append(Point)
+	
+	##########################################################################
 	# 欠落データ生成
 	
 	def GenSpeed(self, force = False):
-		if len(self.Points) == 0 or (not force and self.Points[0].Speed is not None):
-			return
+		if len(self.Points) == 0 or not (force or self.NoSpeed): return
 		
 		self.GenXY();
-		self.Points[0].Speed = 0
+		if force or self.Points[0].Speed is None:
+			self.Points[0].Speed = 0
 		
 		for i in range(1, len(self.Points)):
-			self.Points[i].Speed = self.Distance(i - 1, i) / (
-				self.Points[i].DateTime.timestamp() - self.Points[i - 1].DateTime.timestamp()
-			) * (3600 / 1000)
+			if force or self.Points[i].Speed is None:
+				self.Points[i].Speed = self.Distance(i - 1, i) / (
+					self.Points[i].DateTime.timestamp() - self.Points[i - 1].DateTime.timestamp()
+				) * (3600 / 1000)
 	
 	def GenBearing(self, force = False):
-		if len(self.Points) == 0 or (not force and self.Points[0].Bearing is not None):
-			return
+		if len(self.Points) == 0 or not (force or self.NoBearing): return
 		
 		self.GenXY();
 		
 		for i in range(1, len(self.Points)):
-			self.Points[i].Bearing = self.Bearing(i - 1, i)
+			if force or self.Points[i].Bearing is None:
+				self.Points[i].Bearing = self.Bearing(i - 1, i)
 		
-		self.Points[0].Bearing = self.Points[1].Bearing
+		if force or self.Points[0].Bearing is None:
+			self.Points[0].Bearing = self.Points[1].Bearing
 	
 	def GenDistance(self, force = False):
-		if len(self.Points) == 0 or (not force and self.Points[0].Distance is not None):
-			return
+		if len(self.Points) == 0 or not (force or self.NoDistance): return
 		
 		self.GenXY();
 		self.Points[0].Distance = 0
@@ -156,11 +176,13 @@ class GpsLogClass:
 			self.Points[i].Distance = self.Points[i - 1].Distance + self.Distance(i - 1, i)
 	
 	def GenAltitude(self, force = False):
-		if len(self.Points) == 0 or (not force and self.Points[0].Altitude is not None):
-			return
+		if len(self.Points) == 0 or not (force or self.NoAltitude): return
 		
-		for i in range(len(self.Points)):
-			self.Points[i].Altitude = 0	# 無いものは無い
+		if force or self.Points[0].Altitude is None:
+			self.Points[0].Altitude = 0
+		
+		for i in range(1, len(self.Points)):
+			self.Points[i].Altitude = self.Points[i - 1].Altitude
 	
 	##########################################################################
 	# reader / writer auto detect
@@ -228,18 +250,17 @@ class GpsLogClass:
 	
 	def Read_nmea(self, FileName):
 		with smart_open(FileName, 'rt') as FileIn:
-			PrevTime = ''
+			Point		= None
+			PrevTime	= ''
 			
 			for Line in FileIn:
 				if Line.startswith('$GPRMC') or Line.startswith('$GPGGA'):
 					Param = Line.split(',')
 					
-					if PrevTime == Param[1]:
-						Point = self.Points[len(self.Points) - 1]
-					else:
+					if PrevTime != Param[1]:
+						if Point: self.Append(Point)
 						Point = PointClass()
-						self.Points.append(Point)
-					PrevTime = Param[1]
+						PrevTime = Param[1]
 					
 					if Line.startswith('$GPRMC'):
 						
@@ -264,6 +285,7 @@ class GpsLogClass:
 					else:
 						if len(Param[9]) > 0:
 							Point.Altitude = float(Param[9])
+			if Point: self.Append(Point)
 	
 	def Write_nmea(self, FileName):
 		with smart_open(FileName, 'wt') as FileOut:
@@ -327,7 +349,7 @@ class GpsLogClass:
 				if m:
 					Point.Bearing = float(m.group(1))
 				
-				self.Points.append(Point)
+				self.Append(Point)
 	
 	def Write_gpx(self, FileName):
 		with smart_open(FileName, 'wt') as FileOut:
@@ -373,7 +395,7 @@ class GpsLogClass:
 				Point.Longitude = float(m.group(1))
 				Point.Latitude  = float(m.group(2))
 				
-				self.Points.append(Point)
+				self.Append(Point)
 	
 	def Write_kml(self, FileName):
 		with smart_open(FileName, 'wt') as FileOut:
@@ -606,7 +628,7 @@ class GpsLogClass:
 										break
 									Point.Bearing = int.from_bytes(data, 'little') / 1000
 									
-									self.Points.append(Point)
+									self.Append(Point)
 	
 	def Write_RaceChrono(self, DirName):
 		if DirName == '-':
@@ -661,7 +683,7 @@ class GpsLogClass:
 					PrevTime = Param[1]
 					
 					Point = PointClass()
-					self.Points.append(Point)
+					self.Append(Point)
 					
 					Point.DateTime	= datetime.datetime.fromisoformat(Param[1].replace('Z', '+00:00'))
 					Point.Longitude	= float(Param[2])
