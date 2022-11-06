@@ -176,6 +176,10 @@ class MainWidget(BoxLayout):
 			
 			from android.permissions import request_permissions, Permission
 			request_permissions([Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE])
+		elif os.environ.get('OS') == 'Windows_NT':
+			self.ids['InputFile'].text			= '.'
+			self.ids['OutputFile'].text			= '.'
+			self.ids['output_format'].text		= 'auto'
 		else:
 			self.ids['InputFile'].text			= os.environ.get('HOME') + '/'
 			self.ids['OutputFile'].text			= os.environ.get('HOME') + '/'
