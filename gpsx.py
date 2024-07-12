@@ -683,13 +683,14 @@ class GpsLogClass:
 					PrevTime = Param[1]
 					
 					Point = PointClass()
-					self.Append(Point)
 					
 					Point.DateTime	= datetime.datetime.fromisoformat(Param[1].replace('Z', '+00:00'))
 					Point.Longitude	= float(Param[2])
 					Point.Latitude	= float(Param[3])
 					Point.Altitude	= float(Param[4])
 					Point.Speed		= float(Param[5])
+					
+					self.Append(Point)
 	
 	##########################################################################
 	# Points dumper
