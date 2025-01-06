@@ -171,7 +171,7 @@ class MainWidget(BoxLayout):
 		
 		if os.environ.get('ANDROID_ROOT'):
 			self.ids['InputFile'].text			= '/sdcard/OneDrive/vsd/log/vsd.log'
-			self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/session_%Y%m%d_%H%M')
+			self.ids['OutputFile'].text			= datetime.datetime.now().strftime('/sdcard/Android/data/com.racechrono.app/files/sessions/session_%Y%m%d_%H%M')
 			self.ids['output_format'].text		= 'RaceChrono'
 			
 			from android.permissions import request_permissions, Permission
