@@ -74,13 +74,14 @@ class GpsLogClass:
 		self.NoDistance	= 0
 		
 		self.FuncTbl = {
-			'nmea':			(self.Read_nmea,		self.Write_nmea),
-			'gpx':			(self.Read_gpx,			self.Write_gpx),
-			'kml':			(self.Read_kml,			self.Write_kml),
-			'log':			(self.Read_vsd,			None),
-			'vsd':			(self.Read_vsd,			None),
-			'RaceChrono':	(self.Read_RaceChrono,	self.Write_RaceChrono),
-			'dbg':			(None,					self.Write_debug),
+			'nmea':			(self.Read_nmea,			self.Write_nmea),
+			'gpx':			(self.Read_gpx,				self.Write_gpx),
+			'kml':			(self.Read_kml,				self.Write_kml),
+			'log':			(self.Read_vsd,				None),
+			'vsd':			(self.Read_vsd,				None),
+			'RaceChrono':	(self.Read_RaceChrono,		self.Write_RaceChrono),
+			'dbg':			(None,						self.Write_debug),
+			'json':			(self.Read_GoogleTimeline,	None),
 		}
 	
 	##########################################################################
@@ -691,6 +692,30 @@ class GpsLogClass:
 					Point.Speed		= float(Param[5])
 					
 					self.Append(Point)
+	
+	##########################################################################
+	# Google Timeline
+	def Read_GoogleTimeline(self, FileName):
+		with smart_open(FileName, 'rt') as FileIn:
+			
+			PrevTime = ''
+			for Line in FileIn:
+				if 'timelinePath' in Line:
+					for Line in FileIn:
+						if ']' in Line: break
+						
+						match = re.search('point.*?([\d\.]+).*?([\d\.]+)', Line)
+						if match:
+							Point = PointClass()
+							Point.Longitude	= float(match.group(2))
+							Point.Latitude	= float(match.group(1))
+							continue
+						
+						match = re.search('time".*?"(.*)"', Line)
+						if match and PrevTime != match.group(1):
+							Point.DateTime	= datetime.datetime.fromisoformat(match.group(1))
+							PrevTime = match.group(1)
+							self.Append(Point)
 	
 	##########################################################################
 	# Points dumper
