@@ -576,7 +576,7 @@ class GpsLogClass:
 	# 1: ULONG epoch 時刻 [ms]
 	# 2: ULONG 走行距離 [1/1000m]
 	# 3: int latitude, int longitude [1/6000000度]
-	# 4: UINT 速度 [1/277.7792km/h, キリがいいのに近いのは 1/512knot?]
+	# 4: UINT 速度 [mm/s]
 	# 5: 高度 [1/1000m]
 	# 6: UINT bearing [1/1000度]
 	# 30002: 捕捉衛生数
@@ -617,7 +617,7 @@ class GpsLogClass:
 									data = fhSpeed.read(4)
 									if len(data) < 4:
 										break
-									Point.Speed = int.from_bytes(data, 'little') / 277.7792
+									Point.Speed = int.from_bytes(data, 'little') / (1000.0 * 1000 / 3600)
 									
 									data = fhAlt.read(4)
 									if len(data) < 4:
@@ -655,7 +655,7 @@ class GpsLogClass:
 		self.GenSpeed()
 		with open(DirName + '/channel_1_100_0_4_0', 'wb') as FileOut:
 			for Point in self.Points:
-				FileOut.write(int(Point.Speed * 277.7792).to_bytes(4, 'little'))
+				FileOut.write(int(Point.Speed * (1000.0 * 1000 / 3600)).to_bytes(4, 'little'))
 		
 		self.GenAltitude()
 		with open(DirName + '/channel_1_100_0_5_0', 'wb') as FileOut:
