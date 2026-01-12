@@ -627,7 +627,7 @@ class GpsLogClass:
 									data = fhDir.read(4)
 									if len(data) < 4:
 										break
-									Point.Bearing = int.from_bytes(data, 'little') / 1000
+									Point.Bearing = (int.from_bytes(data, 'little') % 360000) / 1000
 									
 									self.Append(Point)
 	
