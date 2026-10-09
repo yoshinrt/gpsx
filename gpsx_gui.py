@@ -1,13 +1,14 @@
-usr/bin/env python
+#!/usr/bin/env python
 
 ''' kv sample3 '''
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.lang import Builder
+from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.popup import Popup
-from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
-from kivy.uix.popup import Popup
-from kivy.clock import Clock
+import re
+import subprocess
 
 import datetime
 import os
@@ -232,7 +233,19 @@ class MainWidget(BoxLayout):
 		if Arg.input_format == 'auto':
 			Arg.input_format = None
 		
-		Arg.output_file = self.ids['OutputFile'].text
+		# Test output file is writable
+		output_file_writable = False
+		output_file = self.ids['OutputFile'].text
+		
+		try:
+			output_file_writable = os.access(output_file, os.W_OK)
+		except OSError:
+			output_file_writable = False
+		
+		if output_file_writable:
+			Arg.output_file = output_file
+		else:
+			Arg.output_file = '/sdcard/' + re.sub(r'.*/', '', output_file)
 		
 		Arg.output_format = self.ids['output_format'].text
 		if Arg.output_format == 'auto':
@@ -242,12 +255,16 @@ class MainWidget(BoxLayout):
 			'  in: %s format=%s\n' +
 			'  out: %s format=%s\n') % (
 				Arg.input_file,  Arg.input_format,
-				Arg.output_file, Arg.output_format
+				output_file, Arg.output_format
 			)
 		
 		try:
 			gpsx.Convert(Arg)
 			self.Log += '* done.\n'
+			
+			if not output_file_writable:
+				subprocess.run(["su", "sh", "-c", "mv", Arg.output_file, re.sub(r'[^/]+$', '', output_file)])
+				
 		except Exception as Error:
 			self.Log += '* Error: ' + str(Error) + '\n'
 	
