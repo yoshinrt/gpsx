@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+usr/bin/env python
 
 ''' kv sample3 '''
 from kivy.app import App

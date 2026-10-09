@@ -380,7 +380,7 @@ class GpsLogClass:
 	
 	def Read_kml(self, FileName):
 		with smart_open(FileName, 'rt') as FileIn:
-			for match in re.finditer('<Placemark.*?</Placemark>', FileIn.read(), flags = re.DOTALL):
+			for match in re.finditer('<when>[\S\s]+?</gx:coord>', FileIn.read(), flags = re.DOTALL):
 				Point = PointClass()
 				
 				str = match.group(0)
@@ -390,7 +390,7 @@ class GpsLogClass:
 					continue
 				Point.DateTime = datetime.datetime.fromisoformat(m.group(1).replace('Z', '+00:00'))
 				
-				m = re.search(r'<coordinates>\s*([\d\.\-]+),([\d\.\-]+)\s*</', str)
+				m = re.search(r'<gx:coord>\s*([\d\.\-]+) +([\d\.\-]+)', str)
 				if not m:
 					continue
 				Point.Longitude = float(m.group(1))
